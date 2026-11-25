@@ -27,151 +27,329 @@ Step 6: Display the employee details in MainActivity file.
 Step 7: Save and run the application.
 
 ## PROGRAM:
+
+## activity_main.xml:
 ```
-/*
 Program to print the DatabaseTable using the firebasedatabase”.
-*/
-```
-
-## ACTIVITY MAIN:
-
-```
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="24dp"
-    android:gravity="center_horizontal"
-    android:background="#FFFFFF">
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Firebase"
-        android:textSize="25sp"
-        android:textStyle="bold"
-        android:textColor="#1565C0"
-        android:layout_marginTop="40dp"
-        android:layout_marginBottom="30dp" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Enter Student Name"
-        android:textSize="16sp"
-        android:textColor="#333333"
-        android:layout_marginBottom="8dp" />
+    android:padding="16dp">
 
     <EditText
-        android:id="@+id/nameInput"
+        android:id="@+id/etName"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Enter your name"
-        android:inputType="textPersonName"
-        android:padding="12dp"
-        android:layout_marginBottom="20dp" />
+        android:layout_height="55dp"
+        android:autofillHints="name"
+        android:hint="@string/hint_name"
+        android:inputType="textPersonName" />
 
-    <Button
-        android:id="@+id/saveButton"
+    <EditText
+        android:id="@+id/etAge"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Save to Firebase" />
+        android:importantForAutofill="no"
+        android:hint="@string/hint_age"
+        android:inputType="number" />
 
-    <TextView
-        android:id="@+id/resultText"
+    <EditText
+        android:id="@+id/etSalary"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text=""
-        android:textSize="16sp"
-        android:textColor="#2E7D32"
-        android:gravity="center"
-        android:layout_marginTop="24dp" />
+        android:importantForAutofill="no"
+        android:hint="@string/hint_salary"
+        android:inputType="number" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        style="?android:attr/buttonBarStyle"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btnAdd"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            style="?android:attr/buttonBarButtonStyle"
+            android:text="@string/btn_add" />
+
+        <Button
+            android:id="@+id/btnUpdate"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            style="?android:attr/buttonBarButtonStyle"
+            android:text="@string/btn_update" />
+
+        <Button
+            android:id="@+id/btnDelete"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            style="?android:attr/buttonBarButtonStyle"
+            android:text="@string/btn_delete" />
+    </LinearLayout>
+
+    <ListView
+        android:id="@+id/listView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
 
 </LinearLayout>
 
-```
-
-
-## MAIN ACTIVITY.JAVA
 
 ```
-package com.example.firebase;
+## MainActivity.java:
+```
+package com.example.pmd_ex1;
 
 import android.os.Bundle;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.TextView;
-import android.widget.Toast;
-
+import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
-
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.*;
+import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
 
-    EditText nameInput;
-    Button saveButton;
-    TextView resultText;
+    EditText etName, etAge, etSalary;
+    Button btnAdd, btnUpdate, btnDelete;
+    ListView listView;
 
-    DatabaseReference database;
+    DatabaseReference dbRef;
+
+    ArrayList<String> items = new ArrayList<>();
+    ArrayList<String> keys = new ArrayList<>();
+    ArrayAdapter<String> adapter;
+
+    String selectedKey = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Connect the XML views
-        nameInput = findViewById(R.id.nameInput);
-        saveButton = findViewById(R.id.saveButton);
-        resultText = findViewById(R.id.resultText);
+        etName = findViewById(R.id.etName);
+        etAge = findViewById(R.id.etAge);
+        etSalary = findViewById(R.id.etSalary);
 
-        // Connect to Firebase Realtime Database
-        database = FirebaseDatabase.getInstance()
-                .getReference("Students");
+        btnAdd = findViewById(R.id.btnAdd);
+        btnUpdate = findViewById(R.id.btnUpdate);
+        btnDelete = findViewById(R.id.btnDelete);
+        listView = findViewById(R.id.listView);
 
-        // Save data when the button is clicked
-        saveButton.setOnClickListener(v -> {
+        dbRef = FirebaseDatabase.getInstance()
+                .getReference("Employees");
 
-            String name = nameInput.getText().toString().trim();
+        adapter = new ArrayAdapter<>(
+                this,
+                android.R.layout.simple_list_item_1,
+                items
+        );
 
-            if (name.isEmpty()) {
-                nameInput.setError("Please enter a name");
+        listView.setAdapter(adapter);
+
+        // Read employee details from Firebase
+        dbRef.addValueEventListener(new ValueEventListener() {
+
+            @Override
+            public void onDataChange(DataSnapshot snapshot) {
+                items.clear();
+                keys.clear();
+
+                for (DataSnapshot d : snapshot.getChildren()) {
+                    Emp e = d.getValue(Emp.class);
+
+                    if (e != null) {
+                        items.add(
+                                e.name + " | " + e.age + " | " + e.salary
+                        );
+                        keys.add(d.getKey());
+                    }
+                }
+
+                adapter.notifyDataSetChanged();
+            }
+
+            @Override
+            public void onCancelled(DatabaseError error) {
+                Toast.makeText(
+                        MainActivity.this,
+                        "Read failed: " + error.getMessage(),
+                        Toast.LENGTH_LONG
+                ).show();
+            }
+        });
+
+        // ADD employee
+        btnAdd.setOnClickListener(v -> {
+
+            String name = etName.getText().toString().trim();
+            String age = etAge.getText().toString().trim();
+            String salary = etSalary.getText().toString().trim();
+
+            if (name.isEmpty() || age.isEmpty() || salary.isEmpty()) {
+                Toast.makeText(
+                        this,
+                        "Enter all details",
+                        Toast.LENGTH_SHORT
+                ).show();
                 return;
             }
 
-            database.child("101").child("name")
-                    .setValue(name)
+            Emp e = new Emp(name, age, salary);
+
+            btnAdd.setEnabled(false);
+
+            dbRef.push().setValue(e)
                     .addOnSuccessListener(unused -> {
-                        resultText.setText("Saved successfully: " + name);
                         Toast.makeText(
-                                MainActivity.this,
-                                "Data saved to Firebase",
+                                this,
+                                "Employee added successfully",
                                 Toast.LENGTH_SHORT
                         ).show();
+
+                        clearFields();
                     })
                     .addOnFailureListener(error -> {
                         Toast.makeText(
-                                MainActivity.this,
-                                "Error: " + error.getMessage(),
+                                this,
+                                "Add failed: " + error.getMessage(),
                                 Toast.LENGTH_LONG
                         ).show();
-                    });
+                    })
+                    .addOnCompleteListener(task ->
+                            btnAdd.setEnabled(true));
         });
+
+        // UPDATE selected employee
+        btnUpdate.setOnClickListener(v -> {
+
+            if (selectedKey == null) {
+                Toast.makeText(
+                        this,
+                        "Select an employee from the list first",
+                        Toast.LENGTH_SHORT
+                ).show();
+                return;
+            }
+
+            String name = etName.getText().toString().trim();
+            String age = etAge.getText().toString().trim();
+            String salary = etSalary.getText().toString().trim();
+
+            if (name.isEmpty() || age.isEmpty() || salary.isEmpty()) {
+                Toast.makeText(
+                        this,
+                        "Enter all details",
+                        Toast.LENGTH_SHORT
+                ).show();
+                return;
+            }
+
+            Emp e = new Emp(name, age, salary);
+            String key = selectedKey;
+
+            dbRef.child(key).setValue(e)
+                    .addOnSuccessListener(unused -> {
+                        Toast.makeText(
+                                this,
+                                "Employee updated successfully",
+                                Toast.LENGTH_SHORT
+                        ).show();
+
+                        clearFields();
+                    })
+                    .addOnFailureListener(error ->
+                            Toast.makeText(
+                                    this,
+                                    "Update failed: " + error.getMessage(),
+                                    Toast.LENGTH_LONG
+                            ).show());
+        });
+
+        // DELETE selected employee
+        btnDelete.setOnClickListener(v -> {
+
+            if (selectedKey == null) {
+                Toast.makeText(
+                        this,
+                        "Select an employee from the list first",
+                        Toast.LENGTH_SHORT
+                ).show();
+                return;
+            }
+
+            String key = selectedKey;
+
+            dbRef.child(key).removeValue()
+                    .addOnSuccessListener(unused -> {
+                        Toast.makeText(
+                                this,
+                                "Employee deleted successfully",
+                                Toast.LENGTH_SHORT
+                        ).show();
+
+                        clearFields();
+                    })
+                    .addOnFailureListener(error ->
+                            Toast.makeText(
+                                    this,
+                                    "Delete failed: " + error.getMessage(),
+                                    Toast.LENGTH_LONG
+                            ).show());
+        });
+
+        // Select employee from the list
+        listView.setOnItemClickListener((parent, view, position, id) -> {
+
+            selectedKey = keys.get(position);
+
+            dbRef.child(selectedKey).get()
+                    .addOnSuccessListener(data -> {
+
+                        Emp e = data.getValue(Emp.class);
+
+                        if (e != null) {
+                            etName.setText(e.name);
+                            etAge.setText(e.age);
+                            etSalary.setText(e.salary);
+                        }
+                    })
+                    .addOnFailureListener(error ->
+                            Toast.makeText(
+                                    this,
+                                    "Could not load employee: "
+                                            + error.getMessage(),
+                                    Toast.LENGTH_LONG
+                            ).show());
+        });
+    }
+
+    private void clearFields() {
+        etName.setText("");
+        etAge.setText("");
+        etSalary.setText("");
+        selectedKey = null;
+        listView.clearChoices();
     }
 }
 
 ```
 
 
+
+
 ## OUTPUT
+<img width="1851" height="1093" alt="image" src="https://github.com/user-attachments/assets/d456f590-4f08-4b58-973f-1d063dfb88f4" />
 
-<img width="1917" height="1198" alt="Screenshot 2026-10-26 205739" src="https://github.com/user-attachments/assets/d8939769-2440-42b8-b04e-be6a06db34e8" />
+
+<img width="1912" height="1117" alt="image" src="https://github.com/user-attachments/assets/4fa036b8-d99b-457c-998d-4c796330bc3e" />
 
 
-<img width="1917" height="1087" alt="Screenshot 2026-10-26 205730" src="https://github.com/user-attachments/assets/570033fc-37a0-4f6d-964f-efd0cef3ca7e" />
+
 
 
 
